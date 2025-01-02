@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fraud Detection Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1, h2 {
+            text-align: center;
+            color: #4CAF50;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .form-section, .real-time-section, .dashboard {
+            width: 80%;
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            background-color: #f9f9f9;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .form-section {
+            background-color: #e9f7e9;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        label, input, button {
+            width: 100%;
+            max-width: 400px;
+        }
+        button {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .real-time-section ul {
+            list-style: none;
+            padding: 0;
+        }
+        .real-time-section li {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .real-time-section li.fraudulent {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .chart-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .chart-container canvas {
+            max-width: 300px;
+            max-height: 300px;
+        }
+        footer {
+            margin-top: 20px;
+            text-align: center;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fraud Detection System</h1>
+    <div class="container">
+
+        <!-- Form Section -->
+        <div class="form-section">
+            <h2>Manual Transaction Entry</h2>
+            <form action="/predict" method="POST">
+                <label for="feature1">Feature 1:</label>
+                <input type="number" step="any" id="feature1" name="feature1" required>
+
+                <label for="feature2">Feature 2:</label>
+                <input type="number" step="any" id="feature2" name="feature2" required>
+
+                <label for="feature3">Feature 3:</label>
+                <input type="number" step="any" id="feature3" name="feature3" required>
+
+                <label for="feature4">Feature 4:</label>
+                <input type="number" step="any" id="feature4" name="feature4" required>
+
+                <label for="feature5">Feature 5:</label>
+                <input type="number" step="any" id="feature5" name="feature5" required>
+
+                <button type="submit">Predict</button>
+            </form>
+            <h2>{{ prediction_text }}</h2>
+        </div>
+
+        <!-- Real-Time Transactions Section -->
+        <div class="real-time-section">
+            <h2>Real-Time Transactions</h2>
+            <ul id="transactions-list">
+                <li>Loading transactions...</li>
+            </ul>
+        </div>
+
+        <!-- Dashboard Section -->
+        <div class="dashboard">
+            <h2>Dashboard</h2>
+            <p><strong>Total Transactions:</strong> <span id="total-transactions">0</span></p>
+            <p><strong>Fraudulent Transactions:</strong> <span id="fraudulent-transactions">0</span></p>
+            <p><strong>Non-Fraudulent Transactions:</strong> <span id="non-fraudulent-transactions">0</span></p>
+
+            <div class="chart-container">
+                <canvas id="fraudChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <footer>
+        © 2025 Fraud Detection System
+    </footer>
+
+    <script>
+        async function fetchTransactions() {
+            try {
+                const response = await fetch('/transactions');
+                const transactions = await response.json();
+
+                const list = document.getElementById('transactions-list');
+                list.innerHTML = '';
+
+                let fraudulentCount = 0;
+                let nonFraudulentCount = 0;
+
+                transactions.forEach((tx, index) => {
+                    const item = document.createElement('li');
+                    item.innerHTML = `
+                        <strong>Transaction ${index + 1}:</strong><br>
+                        Feature 1: ${tx.feature1}<br>
+                        Feature 2: ${tx.feature2}<br>
+                        Feature 3: ${tx.feature3}<br>
+                        Feature 4: ${tx.feature4}<br>
+                        Feature 5: ${tx.feature5}<br>
+                        Result: <strong>${tx.result}</strong>
+                    `;
+
+                    if (tx.result === "Fraudulent") {
+                        fraudulentCount++;
+                        item.classList.add("fraudulent");
+                    } else {
+                        nonFraudulentCount++;
+                        item.classList.add("not-fraudulent");
+                    }
+
+                    list.appendChild(item);
+                });
+
+                // Update dashboard metrics
+                document.getElementById('total-transactions').innerText = fraudulentCount + nonFraudulentCount;
+                document.getElementById('fraudulent-transactions').innerText = fraudulentCount;
+                document.getElementById('non-fraudulent-transactions').innerText = nonFraudulentCount;
+
+                // Update pie chart
+                fraudChart.data.datasets[0].data = [fraudulentCount, nonFraudulentCount];
+                fraudChart.update();
+            } catch (error) {
+                console.error("Failed to fetch transactions:", error);
+            }
+        }
+
+        const ctx = document.getElementById('fraudChart').getContext('2d');
+        const fraudChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['Fraudulent', 'Not Fraudulent'],
+                datasets: [{
+                    data: [0, 0],
+                    backgroundColor: ['#f8d7da', '#d4edda'],
+                    borderColor: ['#721c24', '#155724'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 14 }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(2);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        setInterval(fetchTransactions, 2000);
+    </script>
+</body>
+</html>
